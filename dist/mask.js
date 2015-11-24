@@ -1,7 +1,7 @@
 /*!
  * angular-ui-mask
  * https://github.com/angular-ui/ui-mask
- * Version: 1.4.1 - 2015-08-04T04:31:00.148Z
+ * Version: 1.4.7 - 2015-10-17T13:33:56.926Z
  * License: MIT
  */
 
@@ -18,9 +18,10 @@ angular.module('ui.mask', [])
                 'A': /[a-zA-Z]/,
                 '*': /[a-zA-Z0-9]/
             },
-            clearOnBlur: true
+            clearOnBlur: true,
+            eventsToHandle: ['input', 'keyup', 'click', 'focus']
         })
-        .directive('uiMask', ['uiMaskConfig', '$parse', function(maskConfig, $parse) {
+        .directive('uiMask', ['uiMaskConfig', function(maskConfig) {
                 function isFocused (elem) {
                   return elem === document.activeElement && (!document.hasFocus || document.hasFocus()) && !!(elem.type || elem.href || ~elem.tabIndex);
                 }
@@ -58,7 +59,7 @@ angular.module('ui.mask', [])
                             }
 
                             function initPlaceholder(placeholderAttr) {
-                                if (!angular.isDefined(placeholderAttr)) {
+                                if ( ! placeholderAttr) {
                                     return;
                                 }
 
@@ -66,9 +67,15 @@ angular.module('ui.mask', [])
 
                                 // If the mask is processed, then we need to update the value
                                 if (maskProcessed) {
-                                    eventHandler();
+                                    iElement.val(maskValue(unmaskValue(iElement.val())));
                                 }
                             }
+                            var modelViewValue = false;
+                            iAttrs.$observe('modelViewValue', function(val) {
+                                if (val === 'true') {
+                                    modelViewValue = true;
+                                }
+                            });
 
                             function formatter(fromModelValue) {
                                 if (!maskProcessed) {
@@ -95,7 +102,11 @@ angular.module('ui.mask', [])
                                 if (value === '' && iAttrs.required) {
                                     controller.$setValidity('required', !controller.$error.required);
                                 }
-                                return isValid ? value : undefined;
+                                if (isValid) {
+                                    return modelViewValue ? controller.$viewValue : value;
+                                } else {
+                                    return undefined;
+                                }
                             }
 
                             var linkOptions = {};
@@ -110,7 +121,9 @@ angular.module('ui.mask', [])
                                                 if (current[i] === undefined) {
                                                     current[i] = angular.copy(original[i]);
                                                 } else {
-                                                    angular.extend(current[i], original[i]);
+                                                    if (angular.isObject(current[i])) {
+                                                        angular.extend(current[i], original[i]);
+                                                    }
                                                 }
                                             }
                                         }
@@ -128,18 +141,6 @@ angular.module('ui.mask', [])
                             else {
                                 iAttrs.$observe('placeholder', initPlaceholder);
                             }
-                            var modelViewValue = false;
-                            iAttrs.$observe('modelViewValue', function(val) {
-                                if (val === 'true') {
-                                    modelViewValue = true;
-                                }
-                            });
-                            scope.$watch(iAttrs.ngModel, function(val) {
-                                if (modelViewValue && val) {
-                                    var model = $parse(iAttrs.ngModel);
-                                    model.assign(scope, controller.$viewValue);
-                                }
-                            });
                             controller.$formatters.push(formatter);
                             controller.$parsers.push(parser);
 
@@ -168,16 +169,19 @@ angular.module('ui.mask', [])
                                 value = oldValueUnmasked = unmaskValue(controller.$modelValue || '');
                                 valueMasked = oldValue = maskValue(value);
                                 isValid = validateValue(value);
-                                var viewValue = isValid && value.length ? valueMasked : '';
                                 if (iAttrs.maxlength) { // Double maxlength to allow pasting new val at end of mask
                                     iElement.attr('maxlength', maskCaretMap[maskCaretMap.length - 1] * 2);
                                 }
-                                if (!angular.isDefined(iAttrs.uiMaskPlaceholder)) {
+                                if ( ! originalPlaceholder) {
                                     iElement.attr('placeholder', maskPlaceholder);
                                 }
-                                iElement.val(viewValue);
-                                controller.$viewValue = viewValue;
-                                controller.$setValidity('mask', isValid);
+                                var viewValue = controller.$modelValue;
+                                var idx = controller.$formatters.length;
+                                while(idx--) {
+                                    viewValue = controller.$formatters[idx](viewValue);
+                                }
+                                controller.$viewValue = viewValue || '';
+                                controller.$render();
                                 // Not using $setViewValue so we don't clobber the model value and dirty the form
                                 // without any kind of user interaction.
                             }
@@ -188,7 +192,7 @@ angular.module('ui.mask', [])
                                 }
                                 iElement.bind('blur', blurHandler);
                                 iElement.bind('mousedown mouseup', mouseDownUpHandler);
-                                iElement.bind('input keyup click focus', eventHandler);
+                                iElement.bind(linkOptions.eventsToHandle.join(' '), eventHandler);
                                 iElement.bind('paste', onPasteHandler);
                                 eventsBound = true;
                             }
@@ -312,7 +316,8 @@ angular.module('ui.mask', [])
                                 maskComponents = getMaskComponents();
                                 maskProcessed = maskCaretMap.length > 1 ? true : false;
                             }
-
+                            
+                            var prevValue = iElement.val(); 
                             function blurHandler() {
                                 if (linkOptions.clearOnBlur) {
                                     oldCaretPosition = 0;
@@ -325,7 +330,34 @@ angular.module('ui.mask', [])
                                         });
                                     }
                                 }
+                                //Check for different value and trigger change.
+                                if (value !== prevValue) {
+                                    triggerChangeEvent(iElement[0]);
+                                }
+                                prevValue = value;
                             }
+                            
+                            function triggerChangeEvent(element) {
+                          		var change;
+                          		if (typeof window.Event == 'function' && !element.fireEvent) {
+                          			// modern browsers and Edge
+                          			change = new Event('change', {
+                          				view: window,
+                          				bubbles: true,
+                          				cancelable: false
+                          			});
+                          			element.dispatchEvent(change);
+                          		} else if ('createEvent' in document) {
+                          			// older browsers
+                          			change = document.createEvent('HTMLEvents');
+                          			change.initEvent('change', false, true);
+                          			element.dispatchEvent(change);
+                          		}
+                          		else if (element.fireEvent) {
+                          			// IE <= 11
+                          			element.fireEvent('onchange');
+                          		}
+                          	}
 
                             function mouseDownUpHandler(e) {
                                 if (e.type === 'mousedown') {
@@ -418,7 +450,10 @@ angular.module('ui.mask', [])
                                 oldValue = valMasked;
                                 oldValueUnmasked = valUnmasked;
                                 iElement.val(valMasked);
-                                controller.$setViewValue(valUnmasked);
+                                
+                                scope.$apply(function() {
+                                    controller.$setViewValue(valUnmasked); // $setViewValue should be run in angular context, otherwise the changes will be invisible to angular and user code.
+                                });                                
 
                                 // Caret Repositioning
                                 // ===================
