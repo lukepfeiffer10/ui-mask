@@ -100,7 +100,7 @@
                                 </p>
                             </div>
                         </div>
-                        
+
                         <div class="form-group">
                             <label class="col-sm-3" for="modelViewValue">Model View Value:</label>
 
@@ -108,7 +108,7 @@
                                 <input type="checkbox" id="modelViewValue" ng-model="modelViewValue" style="vertical-align: top;">
                             </div>
                         </div>
-                        
+
                         <div class="form-group">
                             <label class="col-sm-3">Re-initialize:</label>
 
@@ -117,7 +117,7 @@
                                 <input type="checkbox" ng-model="remove" />
                             </div>
                         </div>
-                        
+
                         <div class="form-group" ng-init="e.input = e.keyup = e.click = e.focus = true;">
                             <label class="col-sm-3">Events to handle:</label>
 
@@ -127,6 +127,24 @@
                                 <span class="col-sm-3">click</span><input type="checkbox" id="click" ng-model="e.click" ng-click="options = {eventsToHandle: [e.input ? 'input' : null, e.keyup ? 'keyup' : null, e.click ? 'click' : null, e.focus ? 'focus' : null]}" style="vertical-align: top;"><br>
                                 <span class="col-sm-3">focus</span><input type="checkbox" id="focus" ng-model="e.focus" ng-click="options = {eventsToHandle: [e.input ? 'input' : null, e.keyup ? 'keyup' : null, e.click ? 'click' : null, e.focus ? 'focus' : null]}" style="vertical-align: top;"><br>
                                 <span class="col-sm-3">ui-options</span><span>{{options | json}}</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="col-sm-3">UI Mask Filter:</label>
+
+                            <div class="col-sm-9" ng-init="filterVM = { x: 1234567890, y: '(999) 999-9999' }">
+                                <p>
+                                  <input type="text" class="form-control" id="maskFilterValue" ng-model="filterVM.x" placeholder="Filter Value" />
+                                </p>
+                                <p>
+                                  <input type="text" class="form-control" id="maskFilterValue" ng-model="filterVM.y" placeholder="Filter Mask" />
+                                </p>
+                                <p>
+                                  <div id="maskFilter">{{ filterVM.x | uiMask: filterVM.y}}</div>
+                                  <span class="help-inline">
+                                      <code>{{filterVM.x}} | uiMask: '{{filterVM.y}}'</code>
+                                  </span>
+                                </p>
                             </div>
                         </div>
                     </form>
